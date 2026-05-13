@@ -30,8 +30,8 @@ def _build_card(r: AlgoResult) -> ft.Card:
     rows: List[ft.Control] = [
         ft.Container(
             content=ft.Text(r.label, weight=ft.FontWeight.BOLD, color=color, size=14),
-            border=ft.border.only(left=ft.BorderSide(3, color)),
-            padding=ft.padding.only(left=8),
+            border=ft.Border.only(left=ft.BorderSide(3, color)),
+            padding=ft.Padding.only(left=8),
         ),
         ft.Divider(height=10, color=ft.Colors.TRANSPARENT),
     ]
@@ -138,8 +138,8 @@ def _build_cache_vis(r: AlgoResult) -> ft.Column:
 def main(page: ft.Page) -> None:
     page.title = "Fibonacci — Comparaison d'implémentations"
     page.theme_mode = ft.ThemeMode.DARK
-    page.padding = ft.padding.symmetric(horizontal=28, vertical=20)
-    page.scroll = ft.ScrollMode.AUTO
+    page.padding = ft.Padding.all(0)
+    page.scroll = None
     try:
         page.window.width = 920
         page.window.min_width = 700
@@ -162,7 +162,7 @@ def main(page: ft.Page) -> None:
     )
     include_naive_cb = ft.Checkbox(label="Inclure la récursive naïve", value=True)
     loading_ring = ft.ProgressRing(width=22, height=22, stroke_width=3, visible=False)
-    compute_btn = ft.ElevatedButton(
+    compute_btn = ft.Button(
         "Calculer", icon=ft.Icons.PLAY_ARROW,
         style=ft.ButtonStyle(bgcolor=ft.Colors.BLUE_700),
     )
@@ -271,7 +271,7 @@ def main(page: ft.Page) -> None:
                     padding=16,
                     bgcolor="#22FFB300",
                     border_radius=8,
-                    border=ft.border.all(1, "#44FFB300"),
+                    border=ft.Border.all(1, "#44FFB300"),
                 )
                 winner_box.visible = True
 
@@ -288,32 +288,38 @@ def main(page: ft.Page) -> None:
 
     # ── Layout ───────────────────────────────────────────────────────────────
     page.add(
-        ft.Text("Fibonacci", size=28, weight=ft.FontWeight.BOLD),
-        ft.Text(
-            "Comparaison d'implémentations Python — Cache · Récursion · Itération · SymPy",
-            size=13, color=ft.Colors.GREY_400,
-        ),
-        ft.Divider(height=20),
+        ft.ListView(
+            controls=[
+                ft.Text("Fibonacci", size=28, weight=ft.FontWeight.BOLD),
+                ft.Text(
+                    "Comparaison d'implémentations Python — Cache · Récursion · Itération · SymPy",
+                    size=13, color=ft.Colors.GREY_400,
+                ),
+                ft.Divider(height=20),
 
-        ft.Row([n_slider, n_field],
-               vertical_alignment=ft.CrossAxisAlignment.CENTER, spacing=12),
-        warning_text,
-        ft.Row(
-            [include_naive_cb, ft.Container(expand=True), loading_ring, compute_btn],
-            vertical_alignment=ft.CrossAxisAlignment.CENTER, spacing=10,
-        ),
-        ft.Divider(height=20),
+                ft.Row([n_slider, n_field],
+                       vertical_alignment=ft.CrossAxisAlignment.CENTER, spacing=12),
+                warning_text,
+                ft.Row(
+                    [include_naive_cb, ft.Container(expand=True), loading_ring, compute_btn],
+                    vertical_alignment=ft.CrossAxisAlignment.CENTER, spacing=10,
+                ),
+                ft.Divider(height=20),
 
-        cards_row,
-        integrity_row,
-        ft.Divider(height=16),
-        perf_col,
-        ft.Divider(height=16),
-        cache_col,
-        ft.Divider(height=16),
-        winner_box,
+                cards_row,
+                integrity_row,
+                ft.Divider(height=16),
+                perf_col,
+                ft.Divider(height=16),
+                cache_col,
+                ft.Divider(height=16),
+                winner_box,
+            ],
+            expand=True,
+            padding=ft.Padding.only(left=28, right=28, top=20, bottom=20),
+        )
     )
 
 
 if __name__ == "__main__":
-    ft.app(target=main)
+    ft.run(main)
