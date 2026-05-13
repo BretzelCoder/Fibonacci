@@ -13,7 +13,7 @@ from fibonacci_service import AlgoResult, ComputeResponse, compute_all
 
 _COLORS: dict[str, str] = {
     "recursive": "#EF5350",
-    "memoized":  "#42A5F5",
+    "cache":     "#42A5F5",
     "iterative": "#66BB6A",
     "sympy":     "#AB47BC",
 }
@@ -22,7 +22,7 @@ _COLOR_FALLBACK = "#9E9E9E"
 
 def _shorten(value: int, max_len: int = 22) -> str:
     s = str(value)
-    return s if len(s) <= max_len else s[: max_len - 1] + "…"
+    return s if len(s) <= max_len else s[: max_len - 1] + "..."
 
 
 def _build_card(r: AlgoResult) -> ft.Card:
@@ -37,7 +37,7 @@ def _build_card(r: AlgoResult) -> ft.Card:
     ]
 
     if r.skipped:
-        display = r.skip_reason or "ignorée"
+        display = r.skip_reason or "skipped"
         rows.append(ft.Text(display, italic=True, color=ft.Colors.GREY_600, size=12))
     else:
         assert r.result is not None
@@ -75,27 +75,41 @@ def _build_perf_bars(resp: ComputeResponse) -> ft.Column:
     max_t = max((r.time_s for r in computed), default=1) or 1
 
     bar_rows: List[ft.Control] = []
-    for r in computed:
-        bar_rows.append(ft.Row(
-            [
-                ft.Text(r.label, width=175, size=12),
-                ft.Container(
-                    content=ft.ProgressBar(
-                        value=r.time_s / max_t,
-                        color=_COLORS.get(r.name, _COLOR_FALLBACK),
-                        bgcolor="#22FFFFFF",
+    for r in resp.results:
+        color = _COLORS.get(r.name, _COLOR_FALLBACK)
+        if r.skipped:
+            bar_rows.append(ft.Row(
+                [
+                    ft.Text(r.label, width=175, size=12, color=ft.Colors.GREY_600),
+                    ft.Text(
+                        r.skip_reason or "skipped",
+                        italic=True, size=12, color=ft.Colors.GREY_600, expand=True,
                     ),
-                    expand=True, height=16,
-                ),
-                ft.Text(f"{r.time_s:.6f} s", width=110, size=12,
-                        text_align=ft.TextAlign.RIGHT),
-            ],
-            vertical_alignment=ft.CrossAxisAlignment.CENTER,
-            spacing=12,
-        ))
+                ],
+                vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                spacing=12,
+            ))
+        else:
+            bar_rows.append(ft.Row(
+                [
+                    ft.Text(r.label, width=175, size=12),
+                    ft.Container(
+                        content=ft.ProgressBar(
+                            value=r.time_s / max_t,
+                            color=color,
+                            bgcolor="#22FFFFFF",
+                        ),
+                        expand=True, height=16,
+                    ),
+                    ft.Text(f"{r.time_s:.6f} s", width=110, size=12,
+                            text_align=ft.TextAlign.RIGHT),
+                ],
+                vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                spacing=12,
+            ))
 
     return ft.Column(
-        [ft.Text("Performance relative", size=15, weight=ft.FontWeight.BOLD),
+        [ft.Text("Relative Performance", size=15, weight=ft.FontWeight.BOLD),
          ft.Divider(height=8),
          *bar_rows],
         spacing=6,
@@ -112,12 +126,12 @@ def _build_cache_vis(r: AlgoResult) -> ft.Column:
         pct = value * 100
         return ft.Row(
             [
-                ft.Text(label, width=70, size=12, color=color),
+                ft.Text(label, width=175, size=12, color=color),
                 ft.Container(
                     content=ft.ProgressBar(value=value, color=color, bgcolor="#22FFFFFF"),
                     expand=True, height=16,
                 ),
-                ft.Text(f"{count}  ({pct:.0f}%)", width=95, size=12,
+                ft.Text(f"{count}  ({pct:.0f}%)", width=110, size=12,
                         text_align=ft.TextAlign.RIGHT),
             ],
             vertical_alignment=ft.CrossAxisAlignment.CENTER,
@@ -126,7 +140,7 @@ def _build_cache_vis(r: AlgoResult) -> ft.Column:
 
     return ft.Column(
         [
-            ft.Text("Cache lru_cache (mémoïsée)", size=15, weight=ft.FontWeight.BOLD),
+            ft.Text("lru_cache (Cache)", size=15, weight=ft.FontWeight.BOLD),
             ft.Divider(height=8),
             bar_row("Hits",   "#66BB6A", hit_ratio,     r.cache_hits or 0),
             bar_row("Misses", "#EF5350", 1 - hit_ratio, r.cache_misses or 0),
@@ -136,15 +150,47 @@ def _build_cache_vis(r: AlgoResult) -> ft.Column:
 
 
 def main(page: ft.Page) -> None:
-    page.title = "Fibonacci — Comparaison d'implémentations"
+    page.title = "Fibonacci — Implementation Comparison"
     page.theme_mode = ft.ThemeMode.DARK
-    page.padding = ft.Padding.all(0)
+    page.padding = ft.Padding.only(top=16, right=16, bottom=16, left=0)
     page.scroll = None
+    page.dark_theme = ft.Theme()
     try:
         page.window.width = 920
         page.window.min_width = 700
     except Exception:
         pass
+
+    # ── Custom left scrollbar ─────────────────────────────────────────────────
+    _sb_spacer = ft.Container(height=0)
+    _sb_thumb  = ft.Container(
+        bgcolor=ft.Colors.GREY_500, border_radius=4, width=8, height=40,
+    )
+    _sb_track  = ft.Container(
+        content=ft.Column(
+            controls=[_sb_spacer, _sb_thumb, ft.Container(expand=True)],
+            spacing=0,
+            expand=True,
+        ),
+        bgcolor=ft.Colors.GREY_900,
+        border_radius=4,
+        width=10,
+        visible=False,
+        padding=ft.Padding.symmetric(horizontal=1),
+    )
+
+    def _on_scroll(e: ft.OnScrollEvent) -> None:
+        if e.max_scroll_extent <= 0:
+            _sb_track.visible = False
+            _sb_track.update()
+            return
+        vp        = e.viewport_dimension
+        thumb_h   = max(30, int(vp * vp / (e.max_scroll_extent + vp)))
+        thumb_top = int(e.pixels * (vp - thumb_h) / e.max_scroll_extent)
+        _sb_spacer.height = thumb_top
+        _sb_thumb.height  = thumb_h
+        _sb_track.visible = True
+        _sb_track.update()
 
     # ── Input controls ───────────────────────────────────────────────────────
     n_field = ft.TextField(
@@ -157,22 +203,22 @@ def main(page: ft.Page) -> None:
     n_slider = ft.Slider(min=0, max=50, divisions=50, value=30,
                          label="{value}", expand=True)
     warning_text = ft.Text(
-        f"⚠️  n > {MAX_N_NAIVE} — la version naïve sera très lente !",
+        f"Warning: n > {MAX_N_NAIVE} — Recursive will be very slow!",
         color="#FFB300", visible=False, size=13,
     )
-    include_naive_cb = ft.Checkbox(label="Inclure la récursive naïve", value=True)
+    include_naive_cb = ft.Checkbox(label="Include Recursive", value=False)
     loading_ring = ft.ProgressRing(width=22, height=22, stroke_width=3, visible=False)
     compute_btn = ft.Button(
-        "Calculer", icon=ft.Icons.PLAY_ARROW,
+        content="Compute", icon=ft.Icons.PLAY_ARROW,
         style=ft.ButtonStyle(bgcolor=ft.Colors.BLUE_700),
     )
 
     # ── Dynamic sections ─────────────────────────────────────────────────────
-    cards_row   = ft.Row(wrap=True, spacing=12, run_spacing=12)
+    cards_row     = ft.Row(wrap=True, spacing=12, run_spacing=12, vertical_alignment=ft.CrossAxisAlignment.START)
     integrity_row = ft.Row(visible=False, spacing=8)
-    perf_col    = ft.Column(visible=False)
-    cache_col   = ft.Column(visible=False)
-    winner_box  = ft.Container(visible=False)
+    perf_col      = ft.Column(visible=False)
+    cache_col     = ft.Column(visible=False)
+    winner_box    = ft.Container(visible=False)
 
     # ── Slider ↔ field sync ──────────────────────────────────────────────────
     def refresh_warning() -> None:
@@ -182,12 +228,12 @@ def main(page: ft.Page) -> None:
         except ValueError:
             warning_text.visible = False
 
-    def on_slider(e: ft.ControlEvent) -> None:
-        n_field.value = str(int(n_slider.value))
+    def on_slider(e: ft.Event[ft.Slider]) -> None:
+        n_field.value = str(int(n_slider.value or 0))
         refresh_warning()
         page.update()
 
-    def on_field(e: ft.ControlEvent) -> None:
+    def on_field(e: ft.Event[ft.TextField]) -> None:
         try:
             v = max(0, int(n_field.value or "0"))
             n_slider.value = float(min(v, 50))
@@ -196,7 +242,7 @@ def main(page: ft.Page) -> None:
         refresh_warning()
         page.update()
 
-    def on_naive_cb_change(e: ft.ControlEvent) -> None:
+    def on_naive_cb_change(e: ft.Event[ft.Checkbox]) -> None:
         refresh_warning()
         page.update()
 
@@ -211,9 +257,9 @@ def main(page: ft.Page) -> None:
             if not (0 <= n <= MAX_N):
                 raise ValueError
         except ValueError:
-            page.open(ft.SnackBar(
-                content=ft.Text(f"Entrez un entier entre 0 et {MAX_N}."),
-            ))
+            snack = ft.SnackBar(content=ft.Text(f"Please enter an integer between 0 and {MAX_N}."))
+            page.overlay.append(snack)
+            snack.open = True
             page.update()
             return
 
@@ -233,6 +279,25 @@ def main(page: ft.Page) -> None:
                 cards_row.controls = [_build_card(r) for r in resp.results]
 
                 ok = resp.all_match
+
+                def show_results_popup(_e=None, _resp=resp) -> None:
+                    computed = [r for r in _resp.results if not r.skipped]
+                    value = str(computed[0].result) if computed else "N/A"
+                    def close_dlg(_e, _dlg_ref: list) -> None:
+                        _dlg_ref[0].open = False
+                        page.update()
+
+                    dlg_ref: list = [None]
+                    dlg = ft.AlertDialog(
+                        title=ft.Text(f"F({_resp.n})"),
+                        content=ft.Text(value, selectable=True, size=13),
+                        actions=[ft.TextButton("Close", on_click=lambda e: close_dlg(e, dlg_ref))],
+                    )
+                    dlg_ref[0] = dlg
+                    page.overlay.append(dlg)
+                    dlg.open = True
+                    page.update()
+
                 integrity_row.controls = [
                     ft.Icon(
                         ft.Icons.CHECK_CIRCLE if ok else ft.Icons.ERROR,
@@ -240,9 +305,15 @@ def main(page: ft.Page) -> None:
                         size=18,
                     ),
                     ft.Text(
-                        "Tous les résultats sont identiques." if ok
-                        else "Incohérence détectée !",
-                        size=13,
+                        spans=[ft.TextSpan(
+                            "All results are identical." if ok else "Inconsistency detected!",
+                            style=ft.TextStyle(
+                                size=13,
+                                decoration=ft.TextDecoration.UNDERLINE,
+                                color=ft.Colors.GREEN_400 if ok else ft.Colors.RED_400,
+                            ),
+                            on_click=show_results_popup,
+                        )],
                     ),
                 ]
                 integrity_row.visible = True
@@ -251,7 +322,7 @@ def main(page: ft.Page) -> None:
                 perf_col.visible  = True
 
                 memo: Optional[AlgoResult] = next(
-                    (r for r in resp.results if r.name == "memoized" and not r.skipped), None
+                    (r for r in resp.results if r.name == "cache" and not r.skipped), None
                 )
                 if memo and memo.cache_hits is not None:
                     cache_col.controls = [_build_cache_vis(memo)]
@@ -262,7 +333,7 @@ def main(page: ft.Page) -> None:
                         [
                             ft.Icon(ft.Icons.EMOJI_EVENTS, color=ft.Colors.AMBER_400, size=26),
                             ft.Text(
-                                f"Plus rapide : {resp.best_name}  —  {resp.best_time:.6f} s",
+                                f"Fastest: {resp.best_name}  -  {resp.best_time:.6f} s",
                                 size=15, weight=ft.FontWeight.BOLD,
                             ),
                         ],
@@ -276,7 +347,9 @@ def main(page: ft.Page) -> None:
                 winner_box.visible = True
 
             except Exception as exc:
-                page.open(ft.SnackBar(content=ft.Text(f"Erreur de calcul : {exc}")))
+                snack = ft.SnackBar(content=ft.Text(f"Computation error: {exc}"))
+                page.overlay.append(snack)
+                snack.open = True
             finally:
                 compute_btn.disabled = False
                 loading_ring.visible = False
@@ -287,36 +360,44 @@ def main(page: ft.Page) -> None:
     compute_btn.on_click = on_compute
 
     # ── Layout ───────────────────────────────────────────────────────────────
+    content_col = ft.Column(
+        controls=[
+            ft.Text("Fibonacci", size=28, weight=ft.FontWeight.BOLD),
+            ft.Text(
+                "Python implementation comparison: Recursive · Cache · Iterative · Sympy",
+                size=13, color=ft.Colors.GREY_400,
+            ),
+            ft.Divider(height=20),
+
+            ft.Row([n_slider, n_field],
+                   vertical_alignment=ft.CrossAxisAlignment.CENTER, spacing=12),
+            warning_text,
+            ft.Row(
+                [include_naive_cb, ft.Container(expand=True), loading_ring, compute_btn],
+                vertical_alignment=ft.CrossAxisAlignment.CENTER, spacing=10,
+            ),
+            ft.Divider(height=20),
+
+            cards_row,
+            integrity_row,
+            ft.Divider(height=16),
+            perf_col,
+            ft.Divider(height=16),
+            cache_col,
+            ft.Divider(height=16),
+            winner_box,
+        ],
+        scroll=ft.ScrollMode.HIDDEN,
+        expand=True,
+        on_scroll=_on_scroll,
+    )
+
     page.add(
-        ft.ListView(
-            controls=[
-                ft.Text("Fibonacci", size=28, weight=ft.FontWeight.BOLD),
-                ft.Text(
-                    "Comparaison d'implémentations Python — Cache · Récursion · Itération · SymPy",
-                    size=13, color=ft.Colors.GREY_400,
-                ),
-                ft.Divider(height=20),
-
-                ft.Row([n_slider, n_field],
-                       vertical_alignment=ft.CrossAxisAlignment.CENTER, spacing=12),
-                warning_text,
-                ft.Row(
-                    [include_naive_cb, ft.Container(expand=True), loading_ring, compute_btn],
-                    vertical_alignment=ft.CrossAxisAlignment.CENTER, spacing=10,
-                ),
-                ft.Divider(height=20),
-
-                cards_row,
-                integrity_row,
-                ft.Divider(height=16),
-                perf_col,
-                ft.Divider(height=16),
-                cache_col,
-                ft.Divider(height=16),
-                winner_box,
-            ],
+        ft.Row(
+            controls=[_sb_track, content_col],
             expand=True,
-            padding=ft.Padding.only(left=28, right=28, top=20, bottom=20),
+            vertical_alignment=ft.CrossAxisAlignment.STRETCH,
+            spacing=8,
         )
     )
 

@@ -13,8 +13,6 @@ import time
 from functools import lru_cache
 from typing import Callable, Tuple
 
-import sympy
-
 MAX_N_NAIVE: int = 35    # Exponential cost becomes unacceptable above this
 MAX_N: int = 5_000       # Recursion-depth ceiling for the memoized variant
 
@@ -84,11 +82,14 @@ def fibonacci_sympy(n: int) -> int:
     """
     Fibonacci via SymPy's fast-doubling (Lucas sequences) — O(log n) time, O(1) space.
 
+    SymPy is imported lazily on first call to avoid a ~1-3 s startup penalty.
+
     Raises:
         ValueError: if n < 0.
     """
     if n < 0:
         raise ValueError(f"n must be >= 0, got {n}")
+    import sympy  # noqa: PLC0415
     return int(sympy.fibonacci(n))  # type: ignore[arg-type]
 
 

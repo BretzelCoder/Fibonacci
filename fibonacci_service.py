@@ -55,43 +55,43 @@ def compute_all(n: int, include_naive: bool = True) -> ComputeResponse:
 
     results: List[AlgoResult] = []
 
-    # Naive recursion ──────────────────────────────────────────────────────
+    # Recursive ────────────────────────────────────────────────────────────
     if not include_naive:
         results.append(AlgoResult(
-            name="recursive", label="Récursive Naïve",
+            name="recursive", label="Recursive",
             n=n, result=None, time_s=0.0,
-            skipped=True, skip_reason="désactivée par l'utilisateur",
+            skipped=True, skip_reason="disabled by user",
         ))
     elif n > MAX_N_NAIVE:
         results.append(AlgoResult(
-            name="recursive", label="Récursive Naïve",
+            name="recursive", label="Recursive",
             n=n, result=None, time_s=0.0,
-            skipped=True, skip_reason=f"n > {MAX_N_NAIVE} (coût O(2^n))",
+            skipped=True, skip_reason=f"n > {MAX_N_NAIVE} (O(2^n) cost)",
         ))
     else:
         res, t = measure_execution(fibonacci_recursive, n)
         results.append(AlgoResult(
-            name="recursive", label="Récursive Naïve",
+            name="recursive", label="Recursive",
             n=n, result=res, time_s=t,
         ))
 
-    # Memoized recursion ───────────────────────────────────────────────────
+    # Cache ────────────────────────────────────────────────────────────────
     fibonacci_memoized.cache_clear()
     res, t = measure_execution(fibonacci_memoized, n)
     stats = fibonacci_memoized.cache_info()
     results.append(AlgoResult(
-        name="memoized", label="Mémoïsée (Cache)",
+        name="cache", label="Cache",
         n=n, result=res, time_s=t,
         cache_hits=stats.hits, cache_misses=stats.misses,
     ))
 
     # Iterative ────────────────────────────────────────────────────────────
     res, t = measure_execution(fibonacci_iterative, n)
-    results.append(AlgoResult(name="iterative", label="Itérative", n=n, result=res, time_s=t))
+    results.append(AlgoResult(name="iterative", label="Iterative", n=n, result=res, time_s=t))
 
-    # SymPy ────────────────────────────────────────────────────────────────
+    # Sympy ────────────────────────────────────────────────────────────────
     res, t = measure_execution(fibonacci_sympy, n)
-    results.append(AlgoResult(name="sympy", label="SymPy", n=n, result=res, time_s=t))
+    results.append(AlgoResult(name="sympy", label="Sympy", n=n, result=res, time_s=t))
 
     computed = [r for r in results if not r.skipped]
     all_match = len({r.result for r in computed}) == 1
