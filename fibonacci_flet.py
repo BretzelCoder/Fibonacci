@@ -220,6 +220,22 @@ def main(page: ft.Page) -> None:
     cache_col     = ft.Column(visible=False)
     winner_box    = ft.Container(visible=False)
 
+    results_col = ft.Column(
+        controls=[
+            cards_row,
+            integrity_row,
+            ft.Divider(height=16),
+            perf_col,
+            ft.Divider(height=16),
+            cache_col,
+            ft.Divider(height=16),
+            winner_box,
+        ],
+        scroll=ft.ScrollMode.HIDDEN,
+        expand=True,
+        on_scroll=_on_scroll,
+    )
+
     # ── Slider ↔ field sync ──────────────────────────────────────────────────
     def refresh_warning() -> None:
         try:
@@ -354,13 +370,14 @@ def main(page: ft.Page) -> None:
                 compute_btn.disabled = False
                 loading_ring.visible = False
                 page.update()
+                results_col.scroll_to(offset=0, duration=0)
 
         threading.Thread(target=run, daemon=True).start()
 
     compute_btn.on_click = on_compute
 
     # ── Layout ───────────────────────────────────────────────────────────────
-    content_col = ft.Column(
+    header_col = ft.Column(
         controls=[
             ft.Text("Fibonacci", size=28, weight=ft.FontWeight.BOLD),
             ft.Text(
@@ -368,7 +385,6 @@ def main(page: ft.Page) -> None:
                 size=13, color=ft.Colors.GREY_400,
             ),
             ft.Divider(height=20),
-
             ft.Row([n_slider, n_field],
                    vertical_alignment=ft.CrossAxisAlignment.CENTER, spacing=12),
             warning_text,
@@ -377,27 +393,23 @@ def main(page: ft.Page) -> None:
                 vertical_alignment=ft.CrossAxisAlignment.CENTER, spacing=10,
             ),
             ft.Divider(height=20),
-
-            cards_row,
-            integrity_row,
-            ft.Divider(height=16),
-            perf_col,
-            ft.Divider(height=16),
-            cache_col,
-            ft.Divider(height=16),
-            winner_box,
         ],
-        scroll=ft.ScrollMode.HIDDEN,
-        expand=True,
-        on_scroll=_on_scroll,
+        spacing=4,
     )
 
     page.add(
-        ft.Row(
-            controls=[_sb_track, content_col],
+        ft.Column(
+            controls=[
+                header_col,
+                ft.Row(
+                    controls=[results_col, _sb_track],
+                    expand=True,
+                    vertical_alignment=ft.CrossAxisAlignment.STRETCH,
+                    spacing=8,
+                ),
+            ],
             expand=True,
-            vertical_alignment=ft.CrossAxisAlignment.STRETCH,
-            spacing=8,
+            spacing=0,
         )
     )
 
