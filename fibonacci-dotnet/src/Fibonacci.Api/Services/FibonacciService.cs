@@ -46,14 +46,11 @@ public sealed class FibonacciService : IFibonacciService
 
     private AlgorithmResult RunAlgorithm(IFibonacciAlgorithm algo, int n, bool includeNaive)
     {
-        if (algo.Name == "recursive")
-        {
-            if (!includeNaive)
-                return AlgorithmResult.FromSkipped(algo, n, "Excluded by user.");
+        if (algo.RequiresExplicitInclusion && !includeNaive)
+            return AlgorithmResult.FromSkipped(algo, n, "Excluded by user.");
 
-            if (n > FibonacciConstants.MaxNNaive)
-                return AlgorithmResult.FromSkipped(algo, n, $"n > {FibonacciConstants.MaxNNaive} — O(2^n) cost.");
-        }
+        if (n > algo.MaxN)
+            return AlgorithmResult.FromSkipped(algo, n, $"n > {algo.MaxN} — {algo.TimeComplexity} cost.");
 
         if (algo is ICacheAwareAlgorithm cacheAware)
             cacheAware.ResetCache();
@@ -74,7 +71,7 @@ public sealed class FibonacciService : IFibonacciService
             TimeSeconds: elapsed,
             CacheStats: cacheStats,
             Skipped: false,
-            SkipReason: string.Empty
+            SkipReason: null
         );
     }
 

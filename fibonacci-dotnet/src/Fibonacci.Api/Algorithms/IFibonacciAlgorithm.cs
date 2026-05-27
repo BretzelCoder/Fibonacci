@@ -9,6 +9,7 @@ public interface IFibonacciAlgorithm
     string TimeComplexity { get; }
     string SpaceComplexity { get; }
     int MaxN { get; }
+    bool RequiresExplicitInclusion { get; }
 
     BigInteger Compute(int n);
 }

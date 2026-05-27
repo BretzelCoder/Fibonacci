@@ -14,6 +14,7 @@ public sealed class IterativeAlgorithm : IFibonacciAlgorithm
     public string TimeComplexity => "O(n)";
     public string SpaceComplexity => "O(1)";
     public int MaxN => FibonacciConstants.MaxN;
+    public bool RequiresExplicitInclusion => false;
 
     public BigInteger Compute(int n)
     {

@@ -17,6 +17,7 @@ public sealed class FastDoublingAlgorithm : IFibonacciAlgorithm
     public string TimeComplexity => "O(log n)";
     public string SpaceComplexity => "O(log n)";
     public int MaxN => FibonacciConstants.MaxN;
+    public bool RequiresExplicitInclusion => false;
 
     public BigInteger Compute(int n)
     {

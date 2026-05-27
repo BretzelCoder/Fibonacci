@@ -12,7 +12,7 @@ public record AlgorithmResult(
     double TimeSeconds,
     CacheStats? CacheStats,
     bool Skipped,
-    string SkipReason
+    string? SkipReason
 )
 {
     public static AlgorithmResult FromSkipped(IFibonacciAlgorithm algo, int n, string reason) =>

@@ -1,3 +1,4 @@
+using System.Reflection;
 using System.Text.Json.Serialization;
 using Fibonacci.Api.Algorithms;
 using Fibonacci.Api.Infrastructure;
@@ -17,7 +18,11 @@ builder.Services.AddControllers()
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
-    options.SwaggerDoc("v1", new() { Title = "Fibonacci API", Version = "v1" }));
+{
+    options.SwaggerDoc("v1", new() { Title = "Fibonacci API", Version = "v1" });
+    var xmlPath = Path.Combine(AppContext.BaseDirectory, $"{Assembly.GetExecutingAssembly().GetName().Name}.xml");
+    options.IncludeXmlComments(xmlPath);
+});
 
 // ── In-process cache (bounded) ────────────────────────────────────────────────
 // SizeLimit is the maximum number of cache entries (one per distinct n value).

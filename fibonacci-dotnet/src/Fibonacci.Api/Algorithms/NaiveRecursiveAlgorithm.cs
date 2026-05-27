@@ -15,6 +15,7 @@ public sealed class NaiveRecursiveAlgorithm : IFibonacciAlgorithm
     public string TimeComplexity => "O(2^n)";
     public string SpaceComplexity => "O(n)";
     public int MaxN => FibonacciConstants.MaxNNaive;
+    public bool RequiresExplicitInclusion => true;
 
     public BigInteger Compute(int n)
     {
