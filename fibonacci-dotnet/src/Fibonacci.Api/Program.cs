@@ -1,4 +1,3 @@
-using System.Reflection;
 using System.Text.Json.Serialization;
 using Fibonacci.Api.Algorithms;
 using Fibonacci.Api.Infrastructure;
@@ -16,13 +15,7 @@ builder.Services.AddControllers()
         options.JsonSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
     });
 
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen(options =>
-{
-    options.SwaggerDoc("v1", new() { Title = "Fibonacci API", Version = "v1" });
-    var xmlPath = Path.Combine(AppContext.BaseDirectory, $"{Assembly.GetExecutingAssembly().GetName().Name}.xml");
-    options.IncludeXmlComments(xmlPath);
-});
+builder.Services.AddOpenApi();
 
 // ── In-process cache (bounded) ────────────────────────────────────────────────
 // SizeLimit is the maximum number of cache entries (one per distinct n value).
@@ -73,8 +66,8 @@ app.UseExceptionHandler(errorApp => errorApp.Run(async context =>
 
 if (app.Environment.IsDevelopment())
 {
-    app.UseSwagger();
-    app.UseSwaggerUI();
+    app.MapOpenApi();
+    app.MapScalarApiReference();
 }
 
 app.UseCors("AllowVueDev");
