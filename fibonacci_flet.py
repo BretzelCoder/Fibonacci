@@ -370,7 +370,7 @@ def main(page: ft.Page) -> None:
                 compute_btn.disabled = False
                 loading_ring.visible = False
                 page.update()
-                results_col.scroll_to(offset=0, duration=0)
+                page.run_task(results_col.scroll_to, offset=0, duration=0)
 
         threading.Thread(target=run, daemon=True).start()
 
