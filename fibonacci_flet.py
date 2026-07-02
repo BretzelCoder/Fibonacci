@@ -8,6 +8,7 @@ from typing import List, Optional
 
 import flet as ft
 
+import fibonacci_history
 from fibonacci_algorithms import MAX_N, MAX_N_NAIVE
 from fibonacci_service import AlgoResult, ComputeResponse, compute_all
 
@@ -149,6 +150,46 @@ def _build_cache_vis(r: AlgoResult) -> ft.Column:
     )
 
 
+_RECURSIVE_STATE_LABELS: dict[str, str] = {
+    "computed": "Recursive: computed",
+    "user_excluded": "Recursive: excluded (user choice)",
+    "forced_skip": "Recursive: skipped (n too large)",
+}
+
+
+def _format_history_entry(entry: "fibonacci_history.HistoryEntry") -> ft.Control:
+    recursive_label = _RECURSIVE_STATE_LABELS.get(entry.recursive_state, entry.recursive_state)
+    match_label = "All algorithms agree" if entry.all_match else "Mismatch detected!"
+    return ft.Container(
+        content=ft.Column(
+            [
+                ft.Row(
+                    [
+                        ft.Text(entry.timestamp, size=12, color=ft.Colors.GREY_400),
+                        ft.Text(f"n = {entry.n}", size=13, weight=ft.FontWeight.BOLD),
+                    ],
+                    alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                ),
+                ft.Text(f"F({entry.n}) = {_shorten(entry.result)}", size=13, selectable=True),
+                ft.Text(recursive_label, size=12, color=ft.Colors.GREY_400),
+                ft.Text(
+                    match_label, size=12,
+                    color=ft.Colors.GREEN_400 if entry.all_match else ft.Colors.RED_400,
+                ),
+                ft.Text(
+                    f"Fastest: {entry.fastest_name}  -  {entry.fastest_time_s:.6f} s "
+                    f"(stddev {entry.stddev_time_s:.6f} s)",
+                    size=12,
+                ),
+            ],
+            spacing=2,
+        ),
+        padding=10,
+        border=ft.Border.all(1, ft.Colors.GREY_800),
+        border_radius=6,
+    )
+
+
 def main(page: ft.Page) -> None:
     page.title = "Fibonacci — Implementation Comparison"
     page.theme_mode = ft.ThemeMode.DARK
@@ -212,6 +253,7 @@ def main(page: ft.Page) -> None:
         content="Compute", icon=ft.Icons.PLAY_ARROW,
         style=ft.ButtonStyle(bgcolor=ft.Colors.BLUE_700),
     )
+    history_btn = ft.Button(content="History", icon=ft.Icons.HISTORY)
 
     # ── Dynamic sections ─────────────────────────────────────────────────────
     cards_row     = ft.Row(wrap=True, spacing=12, run_spacing=12, vertical_alignment=ft.CrossAxisAlignment.START)
@@ -291,6 +333,16 @@ def main(page: ft.Page) -> None:
         def run() -> None:
             try:
                 resp = compute_all(n, include_naive=bool(include_naive_cb.value))
+
+                try:
+                    entry = fibonacci_history.build_entry(
+                        resp, include_naive_requested=bool(include_naive_cb.value)
+                    )
+                    fibonacci_history.append_entry(entry)
+                except Exception as hist_exc:
+                    hist_snack = ft.SnackBar(content=ft.Text(f"Could not save history: {hist_exc}"))
+                    page.overlay.append(hist_snack)
+                    hist_snack.open = True
 
                 cards_row.controls = [_build_card(r) for r in resp.results]
 
@@ -376,6 +428,38 @@ def main(page: ft.Page) -> None:
 
     compute_btn.on_click = on_compute
 
+    # ── History ──────────────────────────────────────────────────────────────
+    def on_history_click(e: Optional[ft.ControlEvent] = None) -> None:
+        entries = list(reversed(fibonacci_history.load_history()))
+
+        if entries:
+            content: ft.Control = ft.Column(
+                [_format_history_entry(entry) for entry in entries],
+                spacing=8,
+                scroll=ft.ScrollMode.AUTO,
+                height=400,
+                width=420,
+            )
+        else:
+            content = ft.Text("No history recorded yet.", italic=True, color=ft.Colors.GREY_600)
+
+        def close_dlg(_e, _dlg_ref: list) -> None:
+            _dlg_ref[0].open = False
+            page.update()
+
+        dlg_ref: list = [None]
+        dlg = ft.AlertDialog(
+            title=ft.Text("Computation History"),
+            content=content,
+            actions=[ft.TextButton("Close", on_click=lambda e: close_dlg(e, dlg_ref))],
+        )
+        dlg_ref[0] = dlg
+        page.overlay.append(dlg)
+        dlg.open = True
+        page.update()
+
+    history_btn.on_click = on_history_click
+
     # ── Layout ───────────────────────────────────────────────────────────────
     header_col = ft.Column(
         controls=[
@@ -389,7 +473,7 @@ def main(page: ft.Page) -> None:
                    vertical_alignment=ft.CrossAxisAlignment.CENTER, spacing=12),
             warning_text,
             ft.Row(
-                [include_naive_cb, ft.Container(expand=True), loading_ring, compute_btn],
+                [include_naive_cb, ft.Container(expand=True), loading_ring, history_btn, compute_btn],
                 vertical_alignment=ft.CrossAxisAlignment.CENTER, spacing=10,
             ),
             ft.Divider(height=20),
