@@ -60,6 +60,17 @@ The program prompts for a value of `n` (default: 30) then displays for each impl
 python fibonacci_flet.py
 ```
 
+### Running tests
+
+```bash
+pip install -r requirements.txt
+pytest
+```
+
+The suite covers `fibonacci_algorithms.py` (correctness, cross-implementation
+agreement, invalid input, cache behavior) and `fibonacci_service.py`
+(orchestration, skip paths, best-result selection).
+
 ### Sample CLI output
 
 ```

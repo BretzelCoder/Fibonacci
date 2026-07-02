@@ -67,7 +67,7 @@ skip paths and best-result selection.
 #### Scenario: n exceeds MAX_N_NAIVE
 - **WHEN** `compute_all(50)` is called
 - **THEN** the `recursive` entry in `results` has `skipped=True` and a
-  `skip_reason` mentioning the `MAX_N_NAIVE` limit
+  `skip_reason` mentioning the O(2^n) cost of naive recursion
 
 #### Scenario: Best algorithm is selected by lowest time
 - **WHEN** `compute_all(20)` is called
