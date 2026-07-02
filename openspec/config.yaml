@@ -1,0 +1,23 @@
+schema: spec-driven
+
+# Project context (optional)
+# This is shown to AI when creating artifacts.
+context: |
+  Tech stack: Python 3, sympy, Flet (GUI).
+  Project purpose: learning project comparing 4 Fibonacci implementations
+  (recursive, lru_cache-memoized, iterative, sympy fast-doubling), focused
+  on practicing caching strategies. This is also the first pilot project for
+  an OpenSpec-based spec-driven pipeline that will later be turned into a
+  reusable template for other projects.
+  Architecture: fibonacci_algorithms.py (pure functions) -> fibonacci_service.py
+  (service layer / orchestration) -> fibonacci_flet.py (GUI) / MyFibonacciTest.py (CLI).
+  Conventions: type hints on public functions, ValueError for invalid input,
+  docstrings on public functions, no external test framework configured yet.
+
+# Per-artifact rules (optional)
+# Add custom rules for specific artifacts.
+rules:
+  proposal:
+    - Keep proposals short and focused on a single capability
+  tasks:
+    - Break tasks into small, independently testable steps
