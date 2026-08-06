@@ -2,6 +2,8 @@
 
 Projet d'apprentissage Python centré sur les stratégies de cache et l'optimisation algorithmique, en comparant quatre approches pour calculer le n-ième terme de la suite de Fibonacci.
 
+> Installation, prérequis et exécution de l'ensemble du dépôt (Python **et** stack .NET 9 / Vue 3) : voir [TECH_README.md](TECH_README.md).
+
 **Définition :** $F(n) = F(n-1) + F(n-2)$, avec $F(0) = 0$ et $F(1) = 1$
 
 ---
