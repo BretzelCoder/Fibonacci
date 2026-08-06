@@ -30,7 +30,7 @@ Le dossier [openspec/](openspec/) contient les specs et propositions de changeme
 | Outil | Version | Vérification |
 |-------|---------|--------------|
 | SDK .NET | 9.0 (testé en 9.0.314) | `dotnet --version` |
-| Node.js | 20+ (testé en 24.14.0) | `node --version` |
+| Node.js | ^20.19 ou >=22.12 — requis par Vite 8 (testé en 24.14.0) | `node --version` |
 | npm | 10+ (testé en 11.9.0) | `npm --version` |
 
 Téléchargements : [SDK .NET 9](https://dotnet.microsoft.com/download/dotnet/9.0) · [Node.js LTS](https://nodejs.org/)
