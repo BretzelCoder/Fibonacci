@@ -13,7 +13,8 @@ import time
 from functools import lru_cache
 from typing import Callable, Tuple
 
-import sympy
+from sympy import fibonacci as _sympy_fibonacci
+_sympy_fibonacci(1)  # force lazy init so measure_execution only times the algorithm
 
 MAX_N_NAIVE: int = 35    # Exponential cost becomes unacceptable above this
 MAX_N: int = 5_000       # Recursion-depth ceiling for the memoized variant
@@ -89,7 +90,7 @@ def fibonacci_sympy(n: int) -> int:
     """
     if n < 0:
         raise ValueError(f"n must be >= 0, got {n}")
-    return int(sympy.fibonacci(n))  # type: ignore[arg-type]
+    return int(_sympy_fibonacci(n))  # type: ignore[arg-type]
 
 
 def measure_execution(func: Callable[[int], int], n: int) -> Tuple[int, float]:

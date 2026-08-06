@@ -8,12 +8,13 @@ from typing import List, Optional
 
 import flet as ft
 
+import fibonacci_history
 from fibonacci_algorithms import MAX_N, MAX_N_NAIVE
 from fibonacci_service import AlgoResult, ComputeResponse, compute_all
 
 _COLORS: dict[str, str] = {
     "recursive": "#EF5350",
-    "memoized":  "#42A5F5",
+    "cache":     "#42A5F5",
     "iterative": "#66BB6A",
     "sympy":     "#AB47BC",
 }
@@ -22,7 +23,7 @@ _COLOR_FALLBACK = "#9E9E9E"
 
 def _shorten(value: int, max_len: int = 22) -> str:
     s = str(value)
-    return s if len(s) <= max_len else s[: max_len - 1] + "…"
+    return s if len(s) <= max_len else s[: max_len - 1] + "..."
 
 
 def _build_card(r: AlgoResult) -> ft.Card:
@@ -30,14 +31,14 @@ def _build_card(r: AlgoResult) -> ft.Card:
     rows: List[ft.Control] = [
         ft.Container(
             content=ft.Text(r.label, weight=ft.FontWeight.BOLD, color=color, size=14),
-            border=ft.border.only(left=ft.BorderSide(3, color)),
-            padding=ft.padding.only(left=8),
+            border=ft.Border.only(left=ft.BorderSide(3, color)),
+            padding=ft.Padding.only(left=8),
         ),
         ft.Divider(height=10, color=ft.Colors.TRANSPARENT),
     ]
 
     if r.skipped:
-        display = r.skip_reason or "ignorée"
+        display = r.skip_reason or "skipped"
         rows.append(ft.Text(display, italic=True, color=ft.Colors.GREY_600, size=12))
     else:
         assert r.result is not None
@@ -75,27 +76,41 @@ def _build_perf_bars(resp: ComputeResponse) -> ft.Column:
     max_t = max((r.time_s for r in computed), default=1) or 1
 
     bar_rows: List[ft.Control] = []
-    for r in computed:
-        bar_rows.append(ft.Row(
-            [
-                ft.Text(r.label, width=175, size=12),
-                ft.Container(
-                    content=ft.ProgressBar(
-                        value=r.time_s / max_t,
-                        color=_COLORS.get(r.name, _COLOR_FALLBACK),
-                        bgcolor="#22FFFFFF",
+    for r in resp.results:
+        color = _COLORS.get(r.name, _COLOR_FALLBACK)
+        if r.skipped:
+            bar_rows.append(ft.Row(
+                [
+                    ft.Text(r.label, width=175, size=12, color=ft.Colors.GREY_600),
+                    ft.Text(
+                        r.skip_reason or "skipped",
+                        italic=True, size=12, color=ft.Colors.GREY_600, expand=True,
                     ),
-                    expand=True, height=16,
-                ),
-                ft.Text(f"{r.time_s:.6f} s", width=110, size=12,
-                        text_align=ft.TextAlign.RIGHT),
-            ],
-            vertical_alignment=ft.CrossAxisAlignment.CENTER,
-            spacing=12,
-        ))
+                ],
+                vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                spacing=12,
+            ))
+        else:
+            bar_rows.append(ft.Row(
+                [
+                    ft.Text(r.label, width=175, size=12),
+                    ft.Container(
+                        content=ft.ProgressBar(
+                            value=r.time_s / max_t,
+                            color=color,
+                            bgcolor="#22FFFFFF",
+                        ),
+                        expand=True, height=16,
+                    ),
+                    ft.Text(f"{r.time_s:.6f} s", width=110, size=12,
+                            text_align=ft.TextAlign.RIGHT),
+                ],
+                vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                spacing=12,
+            ))
 
     return ft.Column(
-        [ft.Text("Performance relative", size=15, weight=ft.FontWeight.BOLD),
+        [ft.Text("Relative Performance", size=15, weight=ft.FontWeight.BOLD),
          ft.Divider(height=8),
          *bar_rows],
         spacing=6,
@@ -112,12 +127,12 @@ def _build_cache_vis(r: AlgoResult) -> ft.Column:
         pct = value * 100
         return ft.Row(
             [
-                ft.Text(label, width=70, size=12, color=color),
+                ft.Text(label, width=175, size=12, color=color),
                 ft.Container(
                     content=ft.ProgressBar(value=value, color=color, bgcolor="#22FFFFFF"),
                     expand=True, height=16,
                 ),
-                ft.Text(f"{count}  ({pct:.0f}%)", width=95, size=12,
+                ft.Text(f"{count}  ({pct:.0f}%)", width=110, size=12,
                         text_align=ft.TextAlign.RIGHT),
             ],
             vertical_alignment=ft.CrossAxisAlignment.CENTER,
@@ -126,7 +141,7 @@ def _build_cache_vis(r: AlgoResult) -> ft.Column:
 
     return ft.Column(
         [
-            ft.Text("Cache lru_cache (mémoïsée)", size=15, weight=ft.FontWeight.BOLD),
+            ft.Text("lru_cache (Cache)", size=15, weight=ft.FontWeight.BOLD),
             ft.Divider(height=8),
             bar_row("Hits",   "#66BB6A", hit_ratio,     r.cache_hits or 0),
             bar_row("Misses", "#EF5350", 1 - hit_ratio, r.cache_misses or 0),
@@ -135,16 +150,88 @@ def _build_cache_vis(r: AlgoResult) -> ft.Column:
     )
 
 
+_RECURSIVE_STATE_LABELS: dict[str, str] = {
+    "computed": "Recursive: computed",
+    "user_excluded": "Recursive: excluded (user choice)",
+    "forced_skip": "Recursive: skipped (n too large)",
+}
+
+
+def _format_history_entry(entry: "fibonacci_history.HistoryEntry") -> ft.Control:
+    recursive_label = _RECURSIVE_STATE_LABELS.get(entry.recursive_state, entry.recursive_state)
+    match_label = "All algorithms agree" if entry.all_match else "Mismatch detected!"
+    return ft.Container(
+        content=ft.Column(
+            [
+                ft.Row(
+                    [
+                        ft.Text(entry.timestamp, size=12, color=ft.Colors.GREY_400),
+                        ft.Text(f"n = {entry.n}", size=13, weight=ft.FontWeight.BOLD),
+                    ],
+                    alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                ),
+                ft.Text(f"F({entry.n}) = {_shorten(entry.result)}", size=13, selectable=True),
+                ft.Text(recursive_label, size=12, color=ft.Colors.GREY_400),
+                ft.Text(
+                    match_label, size=12,
+                    color=ft.Colors.GREEN_400 if entry.all_match else ft.Colors.RED_400,
+                ),
+                ft.Text(
+                    f"Fastest: {entry.fastest_name}  -  {entry.fastest_time_s:.6f} s "
+                    f"(stddev {entry.stddev_time_s:.6f} s)",
+                    size=12,
+                ),
+            ],
+            spacing=2,
+        ),
+        padding=10,
+        border=ft.Border.all(1, ft.Colors.GREY_800),
+        border_radius=6,
+    )
+
+
 def main(page: ft.Page) -> None:
-    page.title = "Fibonacci — Comparaison d'implémentations"
+    page.title = "Fibonacci — Implementation Comparison"
     page.theme_mode = ft.ThemeMode.DARK
-    page.padding = ft.padding.symmetric(horizontal=28, vertical=20)
-    page.scroll = ft.ScrollMode.AUTO
+    page.padding = ft.Padding.only(top=16, right=16, bottom=16, left=0)
+    page.scroll = None
+    page.dark_theme = ft.Theme()
     try:
         page.window.width = 920
         page.window.min_width = 700
     except Exception:
         pass
+
+    # ── Custom left scrollbar ─────────────────────────────────────────────────
+    _sb_spacer = ft.Container(height=0)
+    _sb_thumb  = ft.Container(
+        bgcolor=ft.Colors.GREY_500, border_radius=4, width=8, height=40,
+    )
+    _sb_track  = ft.Container(
+        content=ft.Column(
+            controls=[_sb_spacer, _sb_thumb, ft.Container(expand=True)],
+            spacing=0,
+            expand=True,
+        ),
+        bgcolor=ft.Colors.GREY_900,
+        border_radius=4,
+        width=10,
+        visible=False,
+        padding=ft.Padding.symmetric(horizontal=1),
+    )
+
+    def _on_scroll(e: ft.OnScrollEvent) -> None:
+        if e.max_scroll_extent <= 0:
+            _sb_track.visible = False
+            _sb_track.update()
+            return
+        vp        = e.viewport_dimension
+        thumb_h   = max(30, int(vp * vp / (e.max_scroll_extent + vp)))
+        thumb_top = int(e.pixels * (vp - thumb_h) / e.max_scroll_extent)
+        _sb_spacer.height = thumb_top
+        _sb_thumb.height  = thumb_h
+        _sb_track.visible = True
+        _sb_track.update()
 
     # ── Input controls ───────────────────────────────────────────────────────
     n_field = ft.TextField(
@@ -157,22 +244,39 @@ def main(page: ft.Page) -> None:
     n_slider = ft.Slider(min=0, max=50, divisions=50, value=30,
                          label="{value}", expand=True)
     warning_text = ft.Text(
-        f"⚠️  n > {MAX_N_NAIVE} — la version naïve sera très lente !",
+        f"Warning: n > {MAX_N_NAIVE} — Recursive will be very slow!",
         color="#FFB300", visible=False, size=13,
     )
-    include_naive_cb = ft.Checkbox(label="Inclure la récursive naïve", value=True)
+    include_naive_cb = ft.Checkbox(label="Include Recursive", value=False)
     loading_ring = ft.ProgressRing(width=22, height=22, stroke_width=3, visible=False)
-    compute_btn = ft.ElevatedButton(
-        "Calculer", icon=ft.Icons.PLAY_ARROW,
+    compute_btn = ft.Button(
+        content="Compute", icon=ft.Icons.PLAY_ARROW,
         style=ft.ButtonStyle(bgcolor=ft.Colors.BLUE_700),
     )
+    history_btn = ft.Button(content="History", icon=ft.Icons.HISTORY)
 
     # ── Dynamic sections ─────────────────────────────────────────────────────
-    cards_row   = ft.Row(wrap=True, spacing=12, run_spacing=12)
+    cards_row     = ft.Row(wrap=True, spacing=12, run_spacing=12, vertical_alignment=ft.CrossAxisAlignment.START)
     integrity_row = ft.Row(visible=False, spacing=8)
-    perf_col    = ft.Column(visible=False)
-    cache_col   = ft.Column(visible=False)
-    winner_box  = ft.Container(visible=False)
+    perf_col      = ft.Column(visible=False)
+    cache_col     = ft.Column(visible=False)
+    winner_box    = ft.Container(visible=False)
+
+    results_col = ft.Column(
+        controls=[
+            cards_row,
+            integrity_row,
+            ft.Divider(height=16),
+            perf_col,
+            ft.Divider(height=16),
+            cache_col,
+            ft.Divider(height=16),
+            winner_box,
+        ],
+        scroll=ft.ScrollMode.HIDDEN,
+        expand=True,
+        on_scroll=_on_scroll,
+    )
 
     # ── Slider ↔ field sync ──────────────────────────────────────────────────
     def refresh_warning() -> None:
@@ -182,12 +286,12 @@ def main(page: ft.Page) -> None:
         except ValueError:
             warning_text.visible = False
 
-    def on_slider(e: ft.ControlEvent) -> None:
-        n_field.value = str(int(n_slider.value))
+    def on_slider(e: ft.Event[ft.Slider]) -> None:
+        n_field.value = str(int(n_slider.value or 0))
         refresh_warning()
         page.update()
 
-    def on_field(e: ft.ControlEvent) -> None:
+    def on_field(e: ft.Event[ft.TextField]) -> None:
         try:
             v = max(0, int(n_field.value or "0"))
             n_slider.value = float(min(v, 50))
@@ -196,7 +300,7 @@ def main(page: ft.Page) -> None:
         refresh_warning()
         page.update()
 
-    def on_naive_cb_change(e: ft.ControlEvent) -> None:
+    def on_naive_cb_change(e: ft.Event[ft.Checkbox]) -> None:
         refresh_warning()
         page.update()
 
@@ -211,9 +315,9 @@ def main(page: ft.Page) -> None:
             if not (0 <= n <= MAX_N):
                 raise ValueError
         except ValueError:
-            page.open(ft.SnackBar(
-                content=ft.Text(f"Entrez un entier entre 0 et {MAX_N}."),
-            ))
+            snack = ft.SnackBar(content=ft.Text(f"Please enter an integer between 0 and {MAX_N}."))
+            page.overlay.append(snack)
+            snack.open = True
             page.update()
             return
 
@@ -230,9 +334,38 @@ def main(page: ft.Page) -> None:
             try:
                 resp = compute_all(n, include_naive=bool(include_naive_cb.value))
 
+                try:
+                    entry = fibonacci_history.build_entry(
+                        resp, include_naive_requested=bool(include_naive_cb.value)
+                    )
+                    fibonacci_history.append_entry(entry)
+                except Exception as hist_exc:
+                    hist_snack = ft.SnackBar(content=ft.Text(f"Could not save history: {hist_exc}"))
+                    page.overlay.append(hist_snack)
+                    hist_snack.open = True
+
                 cards_row.controls = [_build_card(r) for r in resp.results]
 
                 ok = resp.all_match
+
+                def show_results_popup(_e=None, _resp=resp) -> None:
+                    computed = [r for r in _resp.results if not r.skipped]
+                    value = str(computed[0].result) if computed else "N/A"
+                    def close_dlg(_e, _dlg_ref: list) -> None:
+                        _dlg_ref[0].open = False
+                        page.update()
+
+                    dlg_ref: list = [None]
+                    dlg = ft.AlertDialog(
+                        title=ft.Text(f"F({_resp.n})"),
+                        content=ft.Text(value, selectable=True, size=13),
+                        actions=[ft.TextButton("Close", on_click=lambda e: close_dlg(e, dlg_ref))],
+                    )
+                    dlg_ref[0] = dlg
+                    page.overlay.append(dlg)
+                    dlg.open = True
+                    page.update()
+
                 integrity_row.controls = [
                     ft.Icon(
                         ft.Icons.CHECK_CIRCLE if ok else ft.Icons.ERROR,
@@ -240,9 +373,15 @@ def main(page: ft.Page) -> None:
                         size=18,
                     ),
                     ft.Text(
-                        "Tous les résultats sont identiques." if ok
-                        else "Incohérence détectée !",
-                        size=13,
+                        spans=[ft.TextSpan(
+                            "All results are identical." if ok else "Inconsistency detected!",
+                            style=ft.TextStyle(
+                                size=13,
+                                decoration=ft.TextDecoration.UNDERLINE,
+                                color=ft.Colors.GREEN_400 if ok else ft.Colors.RED_400,
+                            ),
+                            on_click=show_results_popup,
+                        )],
                     ),
                 ]
                 integrity_row.visible = True
@@ -251,7 +390,7 @@ def main(page: ft.Page) -> None:
                 perf_col.visible  = True
 
                 memo: Optional[AlgoResult] = next(
-                    (r for r in resp.results if r.name == "memoized" and not r.skipped), None
+                    (r for r in resp.results if r.name == "cache" and not r.skipped), None
                 )
                 if memo and memo.cache_hits is not None:
                     cache_col.controls = [_build_cache_vis(memo)]
@@ -262,7 +401,7 @@ def main(page: ft.Page) -> None:
                         [
                             ft.Icon(ft.Icons.EMOJI_EVENTS, color=ft.Colors.AMBER_400, size=26),
                             ft.Text(
-                                f"Plus rapide : {resp.best_name}  —  {resp.best_time:.6f} s",
+                                f"Fastest: {resp.best_name}  -  {resp.best_time:.6f} s",
                                 size=15, weight=ft.FontWeight.BOLD,
                             ),
                         ],
@@ -271,49 +410,93 @@ def main(page: ft.Page) -> None:
                     padding=16,
                     bgcolor="#22FFB300",
                     border_radius=8,
-                    border=ft.border.all(1, "#44FFB300"),
+                    border=ft.Border.all(1, "#44FFB300"),
                 )
                 winner_box.visible = True
 
             except Exception as exc:
-                page.open(ft.SnackBar(content=ft.Text(f"Erreur de calcul : {exc}")))
+                snack = ft.SnackBar(content=ft.Text(f"Computation error: {exc}"))
+                page.overlay.append(snack)
+                snack.open = True
             finally:
                 compute_btn.disabled = False
                 loading_ring.visible = False
                 page.update()
+                page.run_task(results_col.scroll_to, offset=0, duration=0)
 
         threading.Thread(target=run, daemon=True).start()
 
     compute_btn.on_click = on_compute
 
+    # ── History ──────────────────────────────────────────────────────────────
+    def on_history_click(e: Optional[ft.ControlEvent] = None) -> None:
+        entries = list(reversed(fibonacci_history.load_history()))
+
+        if entries:
+            content: ft.Control = ft.Column(
+                [_format_history_entry(entry) for entry in entries],
+                spacing=8,
+                scroll=ft.ScrollMode.AUTO,
+                height=400,
+                width=420,
+            )
+        else:
+            content = ft.Text("No history recorded yet.", italic=True, color=ft.Colors.GREY_600)
+
+        def close_dlg(_e, _dlg_ref: list) -> None:
+            _dlg_ref[0].open = False
+            page.update()
+
+        dlg_ref: list = [None]
+        dlg = ft.AlertDialog(
+            title=ft.Text("Computation History"),
+            content=content,
+            actions=[ft.TextButton("Close", on_click=lambda e: close_dlg(e, dlg_ref))],
+        )
+        dlg_ref[0] = dlg
+        page.overlay.append(dlg)
+        dlg.open = True
+        page.update()
+
+    history_btn.on_click = on_history_click
+
     # ── Layout ───────────────────────────────────────────────────────────────
+    header_col = ft.Column(
+        controls=[
+            ft.Text("Fibonacci", size=28, weight=ft.FontWeight.BOLD),
+            ft.Text(
+                "Python implementation comparison: Recursive · Cache · Iterative · Sympy",
+                size=13, color=ft.Colors.GREY_400,
+            ),
+            ft.Divider(height=20),
+            ft.Row([n_slider, n_field],
+                   vertical_alignment=ft.CrossAxisAlignment.CENTER, spacing=12),
+            warning_text,
+            ft.Row(
+                [include_naive_cb, ft.Container(expand=True), loading_ring, history_btn, compute_btn],
+                vertical_alignment=ft.CrossAxisAlignment.CENTER, spacing=10,
+            ),
+            ft.Divider(height=20),
+        ],
+        spacing=4,
+    )
+
     page.add(
-        ft.Text("Fibonacci", size=28, weight=ft.FontWeight.BOLD),
-        ft.Text(
-            "Comparaison d'implémentations Python — Cache · Récursion · Itération · SymPy",
-            size=13, color=ft.Colors.GREY_400,
-        ),
-        ft.Divider(height=20),
-
-        ft.Row([n_slider, n_field],
-               vertical_alignment=ft.CrossAxisAlignment.CENTER, spacing=12),
-        warning_text,
-        ft.Row(
-            [include_naive_cb, ft.Container(expand=True), loading_ring, compute_btn],
-            vertical_alignment=ft.CrossAxisAlignment.CENTER, spacing=10,
-        ),
-        ft.Divider(height=20),
-
-        cards_row,
-        integrity_row,
-        ft.Divider(height=16),
-        perf_col,
-        ft.Divider(height=16),
-        cache_col,
-        ft.Divider(height=16),
-        winner_box,
+        ft.Column(
+            controls=[
+                header_col,
+                ft.Row(
+                    controls=[results_col, _sb_track],
+                    expand=True,
+                    vertical_alignment=ft.CrossAxisAlignment.STRETCH,
+                    spacing=8,
+                ),
+            ],
+            expand=True,
+            spacing=0,
+        )
     )
 
 
 if __name__ == "__main__":
-    ft.app(target=main)
+    ft.run(main)

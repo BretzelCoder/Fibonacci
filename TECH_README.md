@@ -7,8 +7,10 @@ Le dépôt contient **deux stacks indépendantes** qui traitent le même sujet (
 
 | Stack | Emplacement | Rôle |
 |-------|-------------|------|
-| Python | racine du dépôt | CLI + interface Flet, 4 implémentations |
+| Python | racine du dépôt | CLI + interface Flet, 4 implémentations, suite pytest |
 | .NET 9 + Vue 3 | [fibonacci-dotnet/](fibonacci-dotnet/) | API REST + SPA de visualisation |
+
+Le dossier [openspec/](openspec/) contient les specs et propositions de changement (pipeline *spec-driven development*) ; il ne fait pas partie du code exécutable.
 
 ---
 
@@ -57,6 +59,7 @@ pip install -r requirements.txt
 Dépendances (`requirements.txt`) :
 - `sympy>=1.12` — implémentation *fast doubling* de référence
 - `flet>=0.24.0` — interface graphique (inutile si vous n'utilisez que la CLI)
+- `pytest>=8.0` et `pytest-cov>=5.0` — suite de tests
 
 > Si la PowerShell refuse d'exécuter `Activate.ps1`, autoriser les scripts locaux pour la session :
 > `Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned`
@@ -70,14 +73,27 @@ python fibonacci_flet.py      # interface graphique Flet
 
 Bornes appliquées : `n ≤ 35` pour la récursion naïve, `n ≤ 5000` pour les autres.
 
-### 3.3 Organisation des modules
+L'interface Flet persiste l'historique des calculs dans `fibonacci_history.json` à la racine du dépôt (fichier gitignoré, créé au premier lancement).
+
+### 3.3 Tests
+
+```powershell
+pytest                    # configuration dans pytest.ini : testpaths = tests
+pytest --cov              # avec couverture (pytest-cov)
+```
+
+La suite couvre `fibonacci_algorithms.py` (exactitude, concordance entre implémentations, entrées invalides, comportement du cache) et `fibonacci_service.py` (orchestration, cas ignorés, sélection du meilleur résultat).
+
+### 3.4 Organisation des modules
 
 | Fichier | Responsabilité |
 |---------|----------------|
 | [fibonacci_algorithms.py](fibonacci_algorithms.py) | fonctions pures + `measure_execution` |
 | [fibonacci_service.py](fibonacci_service.py) | couche service (modèles, orchestration) |
+| [fibonacci_history.py](fibonacci_history.py) | persistance JSON de l'historique des calculs de la GUI |
 | [fibonacci_flet.py](fibonacci_flet.py) | vue Flet |
 | [MyFibonacciTest.py](MyFibonacciTest.py) | point d'entrée CLI |
+| [tests/](tests/) | suite pytest |
 
 ---
 
@@ -250,4 +266,4 @@ Scripts npm disponibles : `dev`, `build`, `preview`, `type-check`.
 
 ## 6. Éléments non versionnés
 
-`bin/`, `obj/`, `node_modules/`, `dist/`, `__pycache__/`, `.venv/` et `launchSettings.json` sont ignorés (voir [.gitignore](.gitignore) et [fibonacci-dotnet/.gitignore](fibonacci-dotnet/.gitignore)). Une installation propre passe donc toujours par `pip install`, `dotnet restore` et `npm install`.
+`bin/`, `obj/`, `node_modules/`, `dist/`, `__pycache__/`, `.venv/`, `fibonacci_history.json` et `launchSettings.json` sont ignorés (voir [.gitignore](.gitignore) et [fibonacci-dotnet/.gitignore](fibonacci-dotnet/.gitignore)). Une installation propre passe donc toujours par `pip install`, `dotnet restore` et `npm install`.
