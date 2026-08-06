@@ -3,6 +3,7 @@ using Fibonacci.Api.Algorithms;
 using Fibonacci.Api.Infrastructure;
 using Fibonacci.Api.Services;
 using Microsoft.AspNetCore.Diagnostics;
+using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
