@@ -247,6 +247,8 @@ npm run build
 
 Scripts npm disponibles : `dev`, `build`, `preview`, `type-check`.
 
+> **TypeScript est volontairement maintenu en 5.x.** `vue-tsc` 3.x se greffe sur `typescript/lib/tsc`, que TypeScript 7 (compilateur natif) n'expose plus : `npm install -D typescript@latest` casse `npm run build` et `npm run type-check` avec `ERR_PACKAGE_PATH_NOT_EXPORTED`. Attendre une version de `vue-tsc` compatible avant de passer en 7.x.
+
 > Le build de l'API utilise `TreatWarningsAsErrors` : tout avertissement du compilateur casse la build. C'est volontaire.
 
 ---
