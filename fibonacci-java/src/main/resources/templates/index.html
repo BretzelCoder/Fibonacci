@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Fibonacci — caching strategy comparison</title>
+    <link rel="stylesheet" th:href="@{/css/app.css}">
+</head>
+<!--/*
+  Record components are read with explicit method calls — comparison.rows(), row.result() —
+  rather than SpEL property syntax, because records expose result() and not getResult().
+  ComputeForm is a JavaBean precisely so th:field can bind to it.
+*/-->
+<body>
+<main class="page">
+
+    <header class="page__header">
+        <h1>Fibonacci</h1>
+        <p class="subtitle">
+            Four strategies for computing F(n), measured side by side — Java 21 / Spring Boot.
+        </p>
+    </header>
+
+    <section class="card">
+        <form method="post" th:action="@{/}" th:object="${form}">
+            <div class="field">
+                <label for="n">n</label>
+                <input type="number" id="n" th:field="*{n}" min="0" th:max="${maxN}" required>
+                <small th:text="'0 to ' + ${maxN}">0 to 5000</small>
+            </div>
+
+            <div class="field field--check">
+                <input type="checkbox" id="includeNaive" th:field="*{includeNaive}">
+                <label for="includeNaive">
+                    Include naive recursion
+                    <small th:text="'(skipped above n = ' + ${maxNNaive} + ')'">(skipped above n = 35)</small>
+                </label>
+            </div>
+
+            <p class="error" th:if="${#fields.hasErrors('n')}" th:errors="*{n}">n is invalid.</p>
+
+            <button type="submit">Compute</button>
+        </form>
+    </section>
+
+    <th:block th:if="${comparison != null}">
+
+        <section class="card banner"
+                 th:classappend="${comparison.allMatch()} ? 'banner--ok' : 'banner--warn'">
+            <p class="banner__winner">
+                Fastest for n = <strong th:text="${comparison.n()}">30</strong>:
+                <strong th:text="${comparison.bestName()}">Iterative</strong>
+                <span th:text="'(' + ${#numbers.formatDecimal(comparison.bestTimeSeconds(), 1, 'NONE', 6, 'POINT')} + ' s)'">(0.000003 s)</span>
+            </p>
+            <p class="banner__integrity" th:if="${comparison.allMatch()}">
+                All executed implementations returned the same value.
+            </p>
+            <p class="banner__integrity" th:unless="${comparison.allMatch()}">
+                Implementations disagree — this is a bug, not a rounding artifact.
+            </p>
+        </section>
+
+        <section class="card">
+            <table class="results">
+                <thead>
+                <tr>
+                    <th scope="col">Algorithm</th>
+                    <th scope="col">Time</th>
+                    <th scope="col">Space</th>
+                    <th scope="col">Result</th>
+                    <th scope="col">Elapsed</th>
+                    <th scope="col">Cache</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="row : ${comparison.rows()}"
+                    th:classappend="${row.skipped()} ? 'row--skipped' : ''">
+
+                    <th scope="row">
+                        <span th:text="${row.result().label()}">Iterative</span>
+                        <code th:text="${row.name()}">iterative</code>
+                    </th>
+
+                    <td><code th:text="${row.result().timeComplexity()}">O(n)</code></td>
+                    <td><code th:text="${row.result().spaceComplexity()}">O(1)</code></td>
+
+                    <td class="results__value">
+                        <span th:if="${row.skipped()}" class="skip" th:text="${row.result().skipReason()}">
+                            Excluded by user.
+                        </span>
+                        <th:block th:unless="${row.skipped()}">
+                            <code th:text="${row.displayResult()}">832040</code>
+                            <small th:if="${row.abbreviated()}"
+                                   th:text="${row.digits()} + ' digits'">1045 digits</small>
+                        </th:block>
+                    </td>
+
+                    <td class="results__time">
+                        <th:block th:unless="${row.skipped()}">
+                            <span th:text="${#numbers.formatDecimal(row.result().timeSeconds(), 1, 'NONE', 6, 'POINT')} + ' s'">0.000003 s</span>
+                            <span class="bar" aria-hidden="true">
+                                <span class="bar__fill" th:style="'width:' + ${row.barPercent()} + '%'"></span>
+                            </span>
+                        </th:block>
+                        <span th:if="${row.skipped()}" class="muted">—</span>
+                    </td>
+
+                    <td class="results__cache">
+                        <th:block th:with="stats=${row.result().cacheStats()}">
+                            <th:block th:if="${stats != null}">
+                                <span th:text="'hits ' + ${stats.hits()} + ' / misses ' + ${stats.misses()}">hits 28 / misses 31</span>
+                                <small th:text="${#numbers.formatDecimal(stats.hitRatio() * 100, 1, 'NONE', 1, 'POINT')} + '% hit ratio'">47.5% hit ratio</small>
+                            </th:block>
+                            <span th:if="${stats == null}" class="muted">—</span>
+                        </th:block>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+
+            <p class="note">
+                Bars are linear against the slowest executed algorithm. Elapsed times are
+                single wall-clock measurements taken inside a running JVM: the first run of an
+                algorithm pays for JIT compilation and can be an order of magnitude slower than
+                its steady state. Treat the ranking as indicative, not as a benchmark — a
+                rigorous answer needs JMH.
+            </p>
+        </section>
+    </th:block>
+
+    <footer class="page__footer">
+        <p>
+            Same comparison as the Python and .NET stacks in this repository.
+            JSON contract: <code>POST /api/fibonacci/compute</code>
+        </p>
+    </footer>
+</main>
+</body>
+</html>
