@@ -22,6 +22,9 @@ dist/
 build/
 *.egg-info/
 
+# Java / Maven
+target/
+
 # IDE
 .vscode/
 .idea/

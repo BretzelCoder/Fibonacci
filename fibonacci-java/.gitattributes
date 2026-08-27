@@ -1,0 +1,6 @@
+# The Maven Wrapper shell script must keep LF endings or it fails on Unix with
+# "bad interpreter: /bin/sh^M" once checked out on a machine using autocrlf.
+mvnw text eol=lf
+
+# ...and its Windows counterpart must keep CRLF.
+mvnw.cmd text eol=crlf

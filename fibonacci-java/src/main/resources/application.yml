@@ -1,0 +1,13 @@
+spring:
+  application:
+    name: fibonacci-java
+  thymeleaf:
+    # Fail fast on a typo in a template name instead of a blank page at runtime.
+    check-template-location: true
+
+# Port 8080 is Spring Boot's default and is left as-is on purpose: the .NET API is
+# wired to 5000 and the Vite dev server to 5173, so all three stacks can run together.
+
+logging:
+  level:
+    com.bretzelcoder.fibonacci: INFO

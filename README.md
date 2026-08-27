@@ -2,7 +2,7 @@
 
 A Python learning project focused on caching strategies and algorithmic optimization, comparing four approaches to computing the nth Fibonacci number.
 
-> Prerequisites, setup and usage for the whole repository (Python **and** the .NET 9 / Vue 3 stack): see [TECH_README.md](TECH_README.md).
+> Prerequisites, setup and usage for the whole repository (Python, the .NET 9 / Vue 3 stack **and** the Java 21 / Spring Boot stack): see [TECH_README.md](TECH_README.md).
 
 **Definition:** F(n) = F(n-1) + F(n-2), with F(0) = 0 and F(1) = 1
 
